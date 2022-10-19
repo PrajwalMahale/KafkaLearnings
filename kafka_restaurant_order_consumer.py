@@ -65,22 +65,26 @@ def main(topic):
 
     consumer = Consumer(consumer_conf)
     consumer.subscribe([topic])
+    messages = []
     while True:
         try:
             # SIGINT can't be handled when polling, limit timeout to 1 second.
             msg = consumer.poll(1.0)
             if msg is None:
+                if len(messages) != 0:
+                    df = pd.DataFrame.from_records(messages)
+                    if not os.path.isfile('output.csv'):
+                        df.to_csv('output.csv', index=False)
+                    else:
+                        df.to_csv('output.csv', mode='a', header=False, index=False)
+                    messages = []
                 continue
             order = json_deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
 
             if order is not None:
                 print("User record {}: order: {}\n"
                       .format(msg.key(), order))
-                df = pd.DataFrame.from_dict([order.record])
-                if not os.path.isfile('output.csv'):
-                    df.to_csv('output.csv',index=False)
-                else:
-                    df.to_csv('output.csv', mode='a', header=False,index=False)
+                messages.append(order.record)
 
         except KeyboardInterrupt:
             break
